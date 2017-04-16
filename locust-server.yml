@@ -1,0 +1,87 @@
+---
+- hosts: locust-server
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: update packages cache
+      apt: update_cache=yes cache_valid_time=3600
+
+    - name: install packages
+      apt: name={{ item.name }}
+      with_items:
+        - { name: 'python-pip' }
+        - { name: 'virtualenvwrapper' }
+
+    - pip:
+        name: locustio
+        virtualenv: /opt/locust-venv
+
+    - pip:
+        name: pyzmq
+        virtualenv: /opt/locust-venv
+
+    - name: copy locust file
+      copy: src=locust/locustfile.py dest=/opt/locustfile.py
+      tags:
+        - deploy
+
+    - name: enable proxy module
+      apache2_module: name=proxy
+      notify:
+        - restart apache
+
+    - name: enable proxy_http module
+      apache2_module: name=proxy_http
+      notify:
+        - restart apache
+
+    - name: place apache config of locust
+      template: src=templates/forward-locust.conf.j2 dest=/etc/apache2/sites-available/forward-locust.conf mode=0644
+      notify:
+        - reload apache
+      tags:
+        - deploy
+
+    - name: activate apache config of locust host
+      file:  state=link src=/etc/apache2/sites-available/forward-locust.conf dest=/etc/apache2/sites-enabled/forward-locust.conf
+      notify:
+        - reload apache
+
+    - name: place apache config of nextcloud
+      template: src=templates/nextcloud-virtual-host.conf.j2 dest=/etc/apache2/sites-available/nextcloud-virtual-host.conf mode=0644
+      notify:
+        - reload apache
+
+    - name: activate apache config of regular apache hosts
+      file:  state=link src=/etc/apache2/sites-available/nextcloud-virtual-host.conf dest=/etc/apache2/sites-enabled/nextcloud-virtual-host.conf
+      notify:
+        - reload apache
+
+    - name: place apache config of netdata
+      template: src=templates/forward-netdata.conf.j2 dest=/etc/apache2/sites-available/forward-netdata.conf mode=0644
+      notify:
+        - reload apache
+
+    - name: activate apache config of netdata host
+      file:  state=link src=/etc/apache2/sites-available/forward-netdata.conf dest=/etc/apache2/sites-enabled/forward-netdata.conf
+      notify:
+        - reload apache
+
+    - name: place apache config of status
+      template: src=templates/status.conf.j2 dest=/etc/apache2/sites-available/status.conf mode=0644
+      notify:
+        - reload apache
+
+    - name: activate apache config of status host
+      file:  state=link src=/etc/apache2/sites-available/status.conf dest=/etc/apache2/sites-enabled/status.conf
+      notify:
+        - reload apache
+
+  handlers:
+    - name: restart apache
+      service: name=apache2 state=restarted
+    - name: reload apache
+      service: name=apache2 state=reloaded
+
+

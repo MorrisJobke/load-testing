@@ -1,0 +1,17 @@
+<VirtualHost *:80>
+  ServerName {{locust_domain}}
+  ServerAlias {{locust_domain}}
+  ProxyPreserveHost On
+
+  ProxyPass / http://localhost:8089/
+  ProxyPassReverse / http://localhost:8089/
+
+{% if enable_htpasswd is defined %}
+  <Location />
+    AuthType Basic
+    AuthName "Super Awesome Tool"
+    AuthUserFile /var/www/.htpasswd
+    Require valid-user
+  </Location>
+{% endif %}
+</VirtualHost>

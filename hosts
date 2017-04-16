@@ -1,0 +1,6 @@
+
+[nextcloud]
+
+[locust-server]
+1.2.3.4 ansible_user=abc locust_domain=locust1.local nextcloud_domain=nextcloud-nfs.local netdata_domain=netdata1.local
+1.2.3.5 ansible_user=abc locust_domain=locust2.local nextcloud_domain=nextcloud-os.local netdata_domain=netdata2.local

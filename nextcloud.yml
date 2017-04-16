@@ -1,0 +1,103 @@
+---
+- hosts: nextcloud
+  become: true
+  gather_facts: false
+  vars:
+    mysql_password: yeesieyee9PhiPh3oumoomie3ooloosh
+
+  tasks:
+    - name: update packages cache
+      apt: update_cache=yes cache_valid_time=3600
+
+    - name: install packages
+      apt: name={{ item.name }}
+      with_items:
+        - { name: 'apache2' }
+        - { name: 'libapache2-mod-php7.0' }
+        - { name: 'php7.0-gd' }
+        - { name: 'php7.0-json' }
+        - { name: 'php7.0-mysql' }
+        - { name: 'php-curl' }
+        - { name: 'php7.0-intl' }
+        - { name: 'php7.0-mcrypt' }
+        - { name: 'php-imagick' }
+        - { name: 'php-redis' }
+        - { name: 'php7.0-ldap' }
+        - { name: 'php-zip' }
+        - { name: 'php-mbstring' }
+        - { name: 'php7.0-xml' }
+        - { name: 'php-apcu' }
+        - { name: 'mysql-server' }
+        - { name: 'redis-server' }
+        - { name: 'python-mysqldb' }
+
+    - name: enable mod_php
+      apache2_module: state=present name=php7.0
+
+    - name: enable mod_rewrite
+      apache2_module: state=present name=rewrite
+    - name: enable mod_ssl
+      apache2_module: state=present name=ssl
+    - name: enable mod_headers
+      apache2_module: name=headers
+
+    - name: place nextcloud apache site
+      template: src=templates/nextcloud.conf.j2 dest=/etc/apache2/sites-available/nextcloud.conf mode=0644
+      notify:
+        - reload apache
+      tags:
+        - setup
+
+    - name: disable default apache site
+      file: state=absent path=/etc/apache2/sites-enabled/000-default.conf
+      notify:
+        - reload apache
+
+    - name: activate nextcloud apache site
+      file:  state=link src=/etc/apache2/sites-available/nextcloud.conf dest=/etc/apache2/sites-enabled/nextcloud.conf
+      notify:
+        - reload apache
+
+    - name: set opcache settings
+      copy: src=files/opcache.ini dest=/etc/php/7.0/mods-available/opcache.ini
+
+    - name: create nextcloud dir
+      file: state=directory path=/var/www/nextcloud owner=www-data group=www-data
+
+    - name: create nextcloud database
+      mysql_db: name=nextcloud
+    - name: add nextcloud user
+      mysql_user: name=nextcloud password={{mysql_password}} priv=nextcloud.*:ALL state=present
+
+    - name: clone git
+      git:
+        repo: 'https://github.com/nextcloud/server.git'
+        dest: /var/www/nextcloud
+
+    - name: fix permissions
+      file:
+        path: /var/www/nextcloud/config
+        owner: www-data
+        group: www-data
+        mode: 0755
+
+    - name: fix permissions
+      file:
+        path: /var/www/nextcloud/apps
+        owner: www-data
+        group: www-data
+        mode: 0755
+
+    - name: fix permissions
+      file:
+        path: /var/www/nextcloud/data
+        owner: www-data
+        group: www-data
+        mode: 0700
+
+    - name: place cache.config.php
+      copy: src=files/cache.config.php dest=/var/www/nextcloud/config/cache.config.php owner=www-data group=www-data
+
+  handlers:
+    - name: reload apache
+      service: name=apache state=reloaded
